@@ -1,0 +1,18 @@
+{
+  "name": "Prem's World Utensils Shop",
+  "short_name": "Prem POS",
+  "description": "Offline-first Billing and POS terminal for Prem's World Utensils Shop",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#7c3aed",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
