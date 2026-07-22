@@ -303,8 +303,14 @@ export default function SettingsPage() {
               </div>
               <div className="flex justify-between items-center text-sm border-b pb-2">
                 <span className="text-muted-foreground">{t("dash.syncEngine") || "Sync Engine"}:</span>
-                <span className="font-semibold text-muted-foreground capitalize">
-                  {syncStatus}
+                <span className={`font-semibold capitalize ${
+                  syncStatus === "success" ? "text-success" :
+                  syncStatus === "syncing" ? "text-primary animate-pulse" :
+                  syncStatus === "unconfigured" ? "text-amber-500" :
+                  syncStatus === "error" ? "text-destructive" :
+                  "text-muted-foreground"
+                }`}>
+                  {syncStatus === "unconfigured" ? (t("dash.unconfigured") || "Not Configured") : syncStatus}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm border-b pb-2">
@@ -315,7 +321,18 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {isOnline && (
+            {syncStatus === "unconfigured" && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-600 dark:text-amber-400 flex flex-col gap-1.5 leading-relaxed">
+                <span className="font-bold flex items-center gap-1 text-[13px]">
+                  ⚠️ Firebase Cloud Sync is Inactive
+                </span>
+                <span>
+                  The application is running in local-only mode. If you deployed this to Vercel, make sure you configure your Firebase Environment Variables in the Vercel project dashboard.
+                </span>
+              </div>
+            )}
+
+            {isOnline && syncStatus !== "unconfigured" && (
               <Button 
                 onClick={performManualSync} 
                 disabled={syncStatus === "syncing"} 

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { syncAll, startRealtimeSync, stopRealtimeSync } from "@/lib/db/sync-engine";
 import { initializeDefaultSettings, getSetting, setSetting, SETTINGS_KEYS } from "@/lib/db/dexie-db";
 import { t as translateHelper } from "@/lib/i18n";
+import { dbFirestore } from "@/lib/firebase/config";
 
 interface PWAContextType {
   isOnline: boolean;
@@ -11,7 +12,7 @@ interface PWAContextType {
   showInstallButton: boolean;
   triggerInstall: () => Promise<void>;
   lastSyncTime: string | null;
-  syncStatus: "idle" | "syncing" | "success" | "error";
+  syncStatus: "idle" | "syncing" | "success" | "error" | "unconfigured";
   performManualSync: () => Promise<void>;
   language: "en" | "ta";
   changeLanguage: (lang: "en" | "ta") => Promise<void>;
@@ -25,7 +26,9 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error" | "unconfigured">(
+    dbFirestore ? "idle" : "unconfigured"
+  );
   const [language, setLanguageState] = useState<"en" | "ta">("en");
 
   useEffect(() => {
@@ -44,6 +47,10 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
     const handleOnline = async () => {
       setIsOnlineState(true);
+      if (!dbFirestore) {
+        setSyncStatus("unconfigured");
+        return;
+      }
       setSyncStatus("syncing");
       const res = await syncAll();
       if (res.success) {
@@ -99,7 +106,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
     // Set up periodic sync check every 60 seconds
     const syncInterval = setInterval(() => {
-      if (navigator.onLine) {
+      if (navigator.onLine && dbFirestore) {
         syncAll().then((res) => {
           if (res.success && res.count > 0) {
             setLastSyncTime(new Date().toLocaleTimeString());
@@ -129,6 +136,10 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
   const performManualSync = async () => {
     if (!navigator.onLine) return;
+    if (!dbFirestore) {
+      setSyncStatus("unconfigured");
+      return;
+    }
     setSyncStatus("syncing");
     const res = await syncAll();
     if (res.success) {
