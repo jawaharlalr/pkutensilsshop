@@ -78,6 +78,7 @@ export const SETTINGS_KEYS = {
   PRINTER_SIZE: "printerPaperSize",
   THEME: "theme",
   LANGUAGE: "language",
+  DEFAULT_PRODUCTS_INITIALIZED: "defaultProductsInitialized",
 };
 
 export async function getSetting<T>(key: string, defaultValue: T): Promise<T> {
@@ -123,6 +124,11 @@ export async function initializeDefaultSettings() {
 // Initial sample products setup helper
 export async function initializeDefaultProducts() {
   try {
+    const isInitialized = await getSetting(SETTINGS_KEYS.DEFAULT_PRODUCTS_INITIALIZED, false);
+    if (isInitialized) {
+      return;
+    }
+
     const count = await db.products.count();
     if (count === 0) {
       const defaults: Product[] = [
@@ -140,6 +146,7 @@ export async function initializeDefaultProducts() {
         await db.products.put(item);
       }
     }
+    await setSetting(SETTINGS_KEYS.DEFAULT_PRODUCTS_INITIALIZED, true);
   } catch (error) {
     console.error("Failed to initialize default products:", error);
   }

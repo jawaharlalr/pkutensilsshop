@@ -1,6 +1,10 @@
-const CACHE_NAME = "utensils-billing-cache-v1";
+const CACHE_NAME = "utensils-billing-cache-v2";
 const ASSETS_TO_CACHE = [
   "/",
+  "/products",
+  "/pos",
+  "/sales",
+  "/settings",
   "/manifest.json",
   "/logo.png",
   "/favicon.ico"
@@ -76,10 +80,13 @@ self.addEventListener("fetch", (event) => {
 
           return networkResponse;
         })
-        .catch((error) => {
-          // If offline and navigating to a page, fall back to shell index
+        .catch(async (error) => {
+          // If offline and navigating to a page, fall back to exact page or shell index
           if (event.request.mode === "navigate") {
-            return caches.match("/");
+            const pageMatch = await caches.match(url.pathname);
+            if (pageMatch) return pageMatch;
+            const rootMatch = await caches.match("/");
+            if (rootMatch) return rootMatch;
           }
           throw error;
         });

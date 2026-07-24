@@ -146,6 +146,11 @@ export async function syncAll(): Promise<{ success: boolean; count: number }> {
           const docRef = doc(dbFirestore, "Products", item.docId);
           if (item.action === "delete") {
             await deleteDoc(docRef);
+            // Ensure deleted locally
+            const local = await db.products.where("code").equals(item.docId).first();
+            if (local && local.id) {
+              await db.products.delete(local.id);
+            }
           } else {
             await setDoc(docRef, sanitizePayload(item.payload));
           }
@@ -234,9 +239,19 @@ export async function syncAll(): Promise<{ success: boolean; count: number }> {
     }
 
     // 4. Scan & sync local products to Firestore
+    const pendingProductDeletes = await db.syncQueue
+      .where("collection")
+      .equals("products")
+      .filter((i) => i.action === "delete")
+      .toArray();
+    const pendingDeleteCodes = new Set(pendingProductDeletes.map((i) => i.docId));
+
     const localProducts = await db.products.toArray();
     for (const prod of localProducts) {
       if (prod.code) {
+        if (pendingDeleteCodes.has(prod.code)) {
+          continue;
+        }
         try {
           const docRef = doc(dbFirestore, "Products", prod.code);
           await setDoc(docRef, sanitizePayload({
@@ -287,6 +302,14 @@ export async function pullDownstreamChanges() {
   if (!isOnline()) return;
 
   try {
+    // Check pending deletes in sync queue
+    const pendingDeletes = await db.syncQueue
+      .where("collection")
+      .equals("products")
+      .filter((i) => i.action === "delete")
+      .toArray();
+    const pendingDeleteCodes = new Set(pendingDeletes.map((i) => i.docId));
+
     // 1. Pull Products (Try "Products", fallback to "products")
     let productsSnapshot = await getDocs(collection(dbFirestore, "Products"));
     if (productsSnapshot.empty) {
@@ -296,6 +319,10 @@ export async function pullDownstreamChanges() {
     for (const docSnap of productsSnapshot.docs) {
       const fbProduct = parseProductDoc(docSnap);
       if (!fbProduct) continue;
+
+      if (pendingDeleteCodes.has(fbProduct.code)) {
+        continue; // Skip restoring locally deleted products
+      }
 
       const localProduct = await db.products.where("code").equals(fbProduct.code).first();
 
