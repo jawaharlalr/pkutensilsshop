@@ -76,19 +76,38 @@ export default function DashboardPage() {
 
   const activeInvoicesCount = invoices?.filter((inv) => inv.isDeleted === 0).length || 0;
 
-  // Get recent 5 invoices
+  // Get recent 5 active (non-deleted) invoices
   const recentInvoices = invoices
-    ? [...invoices]
+    ? invoices
+        .filter((inv) => inv.isDeleted === 0)
         .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
         .slice(0, 5)
     : [];
 
+  const formatInvoiceDateTime = (inv: any) => {
+    if (!inv) return "";
+    if (inv.date && inv.time) {
+      try {
+        const [hStr, mStr] = inv.time.split(":");
+        let h = parseInt(hStr, 10);
+        if (!isNaN(h)) {
+          const ampm = h >= 12 ? "PM" : "AM";
+          h = h % 12 || 12;
+          return `${inv.date}  ${String(h).padStart(2, "0")}:${mStr} ${ampm}`;
+        }
+      } catch (e) {}
+      return `${inv.date}  ${inv.time}`;
+    }
+    if (inv.lastUpdated) {
+      const d = new Date(inv.lastUpdated);
+      return `${d.toISOString().split("T")[0]}  ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return inv.date || "";
+  };
+
   const handlePrintInvoice = (inv: any) => {
     setSelectedInvoice(inv);
-    const now = new Date();
-    const formattedDate = now.toISOString().split("T")[0];
-    const formattedTime = now.toTimeString().split(" ")[0];
-    setPrintDateTime(`${formattedDate}  ${formattedTime}`);
+    setPrintDateTime(formatInvoiceDateTime(inv));
     
     // Allow React state updates to render print layout before executing print dialog
     setTimeout(() => {
@@ -192,7 +211,7 @@ export default function DashboardPage() {
                     <TableRow key={inv.id}>
                       <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
                       <TableCell className="font-mono text-xs font-semibold">{inv.invoiceNumber}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{inv.date} {inv.time}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs font-mono">{formatInvoiceDateTime(inv)}</TableCell>
                       <TableCell className="text-right font-bold">₹{inv.grandTotal.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -224,7 +243,9 @@ export default function DashboardPage() {
           </div>
           <div style={{ fontSize: "12px", borderBottom: "1px dashed black", paddingBottom: "5px", marginBottom: "10px" }}>
             <div><b>{t("pos.invoiceNo")}:</b> {selectedInvoice.invoiceNumber}</div>
-            <div><b>Date & Time:</b> {printDateTime || `${selectedInvoice.date}  ${selectedInvoice.time}`}</div>
+            <div><b>Date & Time:</b> {printDateTime || formatInvoiceDateTime(selectedInvoice)}</div>
+            {selectedInvoice.customerName && <div><b>Customer:</b> {selectedInvoice.customerName}</div>}
+            {selectedInvoice.customerPhone && <div><b>Phone:</b> {selectedInvoice.customerPhone}</div>}
             {selectedInvoice.isDeleted === 1 && <div style={{ color: "red", fontWeight: "bold", marginTop: "5px" }}>*** VOIDED BILL ***</div>}
           </div>
           

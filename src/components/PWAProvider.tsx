@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { syncAll, startRealtimeSync, stopRealtimeSync } from "@/lib/db/sync-engine";
-import { initializeDefaultSettings, getSetting, setSetting, SETTINGS_KEYS } from "@/lib/db/dexie-db";
+import { initializeDefaultSettings, initializeDefaultProducts, getSetting, setSetting, SETTINGS_KEYS } from "@/lib/db/dexie-db";
 import { t as translateHelper } from "@/lib/i18n";
 import { dbFirestore } from "@/lib/firebase/config";
 
@@ -32,9 +32,10 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<"en" | "ta">("en");
 
   useEffect(() => {
-    // 1. Initialize default DB settings and load persistent language
+    // 1. Initialize default DB settings & sample products, load persistent language
     async function init() {
       await initializeDefaultSettings();
+      await initializeDefaultProducts();
       const lang = await getSetting(SETTINGS_KEYS.LANGUAGE, "en");
       setLanguageState(lang as "en" | "ta");
     }

@@ -25,6 +25,8 @@ export interface Invoice {
   invoiceNumber: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM:SS
+  customerName?: string;
+  customerPhone?: string;
   items: InvoiceItem[];
   grandTotal: number;
   synced: number; // 0 = unsynced, 1 = synced
@@ -117,3 +119,29 @@ export async function initializeDefaultSettings() {
     }
   }
 }
+
+// Initial sample products setup helper
+export async function initializeDefaultProducts() {
+  try {
+    const count = await db.products.count();
+    if (count === 0) {
+      const defaults: Product[] = [
+        { code: "UT-1001", name: "Stainless Steel Pressure Cooker 5L", nameTamil: "ஸ்டெயின்லெஸ் ஸ்டீல் குக்கர் 5லி", category: "Cookware", sellingPrice: 1450, lastUpdated: Date.now() },
+        { code: "UT-1002", name: "Non-Stick Induction Kadai 26cm", nameTamil: "நான்-ஸ்டிக் கடாய் 26செ.மீ", category: "Cookware", sellingPrice: 850, lastUpdated: Date.now() },
+        { code: "UT-1003", name: "Pure Copper Water Bottle 1000ml", nameTamil: "செம்பு தண்ணீர் பாட்டில் 1லி", category: "Bottles", sellingPrice: 690, lastUpdated: Date.now() },
+        { code: "UT-1004", name: "Insulated Stainless Steel Casserole 2.5L", nameTamil: "ஹாட் பாக்ஸ் கேஸரோல் 2.5லி", category: "Serveware", sellingPrice: 920, lastUpdated: Date.now() },
+        { code: "UT-1005", name: "Traditional Brass Peacock Diya / Lamp", nameTamil: "பித்தளை மயில் விளக்கு", category: "Brassware", sellingPrice: 480, lastUpdated: Date.now() },
+        { code: "UT-1006", name: "Heavy Aluminum Sauce Pan 2L", nameTamil: "அலுமினியம் சாஸ் பேன் 2லி", category: "Cookware", sellingPrice: 380, lastUpdated: Date.now() },
+        { code: "UT-1007", name: "Stainless Steel Dinner Set (24 Pcs)", nameTamil: "ஸ்டீல் டின்னர் செட் 24 பொருட்கள்", category: "Dinnerware", sellingPrice: 2250, lastUpdated: Date.now() },
+        { code: "UT-1008", name: "Cast Iron Dosa Tawa 30cm", nameTamil: "இரும்பு தோசை கல் 30செ.மீ", category: "Traditional", sellingPrice: 780, lastUpdated: Date.now() }
+      ];
+
+      for (const item of defaults) {
+        await db.products.put(item);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to initialize default products:", error);
+  }
+}
+

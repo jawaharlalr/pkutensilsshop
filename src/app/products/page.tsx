@@ -210,38 +210,38 @@ export default function ProductsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("prod.title")}</h1>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Export buttons */}
-          <Button onClick={() => handleExportData("excel")} variant="outline" size="sm" className="gap-1.5 font-semibold">
-            <Download className="h-4 w-4" /> {t("prod.exportExcel")}
-          </Button>
-          <Button onClick={() => handleExportData("csv")} variant="outline" size="sm" className="gap-1.5 font-semibold">
-            <Download className="h-4 w-4" /> {t("prod.exportCsv")}
-          </Button>
+      {/* Export & Action buttons */}
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <Button onClick={() => handleExportData("excel")} variant="outline" size="sm" className="gap-1 px-2.5 h-8 text-xs font-semibold">
+          <Download className="h-3.5 w-3.5" /> {t("prod.exportExcel")}
+        </Button>
+        <Button onClick={() => handleExportData("csv")} variant="outline" size="sm" className="gap-1 px-2.5 h-8 text-xs font-semibold">
+          <Download className="h-3.5 w-3.5" /> {t("prod.exportCsv")}
+        </Button>
 
-          {/* Import file input */}
-          <div className="relative">
-            <input
-              type="file"
-              accept=".xlsx,.csv"
-              id="product-import"
-              className="hidden"
-              onChange={handleImportFile}
-            />
-            <Button onClick={() => document.getElementById("product-import")?.click()} variant="outline" size="sm" className="gap-1.5 font-semibold">
-              <Upload className="h-4 w-4" /> {t("prod.importExcel")}
-            </Button>
-          </div>
-
-          <Button onClick={handleOpenAddModal} className="gap-1.5 font-semibold">
-            <Plus className="h-4 w-4" /> {t("prod.addBtn")}
+        {/* Import file input */}
+        <div className="relative">
+          <input
+            type="file"
+            accept=".xlsx,.csv"
+            id="product-import"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button onClick={() => document.getElementById("product-import")?.click()} variant="outline" size="sm" className="gap-1 px-2.5 h-8 text-xs font-semibold">
+            <Upload className="h-3.5 w-3.5" /> {t("prod.importExcel")}
           </Button>
         </div>
+
+        <Button onClick={handleOpenAddModal} size="sm" className="gap-1 px-3 h-8 text-xs font-semibold ml-auto sm:ml-0">
+          <Plus className="h-3.5 w-3.5" /> {t("prod.addBtn")}
+        </Button>
+      </div>
       </div>
 
       {importSummary && (
-        <div className="p-4 bg-muted border rounded-md text-sm space-y-1 animate-in fade-in-50">
-          <h4 className="font-bold flex items-center gap-1.5 text-primary"><AlertCircle className="h-4.5 w-4.5" /> {t("prod.importReport")}</h4>
+        <div className="p-3 bg-muted border rounded-md text-xs space-y-1 animate-in fade-in-50">
+          <h4 className="font-bold flex items-center gap-1.5 text-primary"><AlertCircle className="h-4 w-4" /> {t("prod.importReport")}</h4>
           <p>{t("prod.importReportSub", { imported: importSummary.imported, updated: importSummary.updated, failed: importSummary.failed })}</p>
         </div>
       )}
@@ -249,47 +249,50 @@ export default function ProductsPage() {
       {/* Search and Table */}
       <div className="flex items-center gap-2 max-w-sm">
         <div className="relative w-full">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={t("prod.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-8 h-9 text-xs sm:text-sm"
           />
         </div>
       </div>
 
-      <div className="border rounded-md bg-card">
-        <Table>
+      <div className="border rounded-md bg-card overflow-x-auto">
+        <Table className="w-full text-xs sm:text-sm">
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-12 text-center">{t("pos.thSNo")}</TableHead>
-              <TableHead>{t("prod.thCode")}</TableHead>
-              <TableHead>{t("prod.thName")}</TableHead>
-              <TableHead>{t("prod.thCategory")}</TableHead>
-              <TableHead className="text-right">{t("prod.thPrice")}</TableHead>
-              <TableHead className="text-right">{t("prod.thActions")}</TableHead>
+            <TableRow className="bg-muted/30">
+              <TableHead className="w-6 sm:w-12 text-center py-2 px-1 text-[11px] sm:text-xs">{t("pos.thSNo")}</TableHead>
+              <TableHead className="py-2 px-1 sm:px-3 text-[11px] sm:text-xs">{t("prod.thName")}</TableHead>
+              <TableHead className="hidden sm:table-cell py-2 px-2 text-[11px] sm:text-xs">{t("prod.thCategory")}</TableHead>
+              <TableHead className="text-right w-16 sm:w-24 py-2 px-1 text-[11px] sm:text-xs">{t("prod.thPrice")}</TableHead>
+              <TableHead className="text-right w-16 sm:w-20 py-2 px-1 text-[11px] sm:text-xs">{t("prod.thActions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredProducts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                   {t("prod.noProducts")}
                 </TableCell>
               </TableRow>
             ) : (
               filteredProducts.map((p, idx) => (
-                <TableRow key={p.id}>
-                  <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
-                  <TableCell className="font-mono text-xs">{p.code}</TableCell>
-                  <TableCell className="font-medium">
-                    <div>{p.name}</div>
-                    {p.nameTamil && <div className="text-xs text-muted-foreground font-normal">{p.nameTamil}</div>}
+                <TableRow key={p.id} className="align-middle">
+                  <TableCell className="text-center font-medium text-muted-foreground align-middle py-2 px-1 text-[10px] sm:text-xs">{idx + 1}</TableCell>
+                  <TableCell className="align-middle py-2 px-1 sm:px-3">
+                    <div className="flex flex-col gap-0.5 max-w-[130px] sm:max-w-none">
+                      <span className="font-semibold text-xs sm:text-sm leading-tight break-words">{p.name}</span>
+                      {p.nameTamil && (
+                        <span className="text-[11px] text-muted-foreground leading-tight break-words">{p.nameTamil}</span>
+                      )}
+                      <span className="text-[10px] font-mono text-muted-foreground/80">{p.code}</span>
+                    </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell align-middle py-2 px-2">
                     {p.category ? (
-                      <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
                         {p.category}
                       </span>
                     ) : (
@@ -298,13 +301,15 @@ export default function ProductsPage() {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-primary">₹{p.sellingPrice.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button onClick={() => handleOpenEditModal(p)} variant="ghost" size="icon" className="h-8 w-8 text-primary">
+                  <TableCell className="text-right font-bold text-primary align-middle py-2 px-1 whitespace-nowrap text-xs sm:text-sm">
+                    ₹{p.sellingPrice.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right align-middle py-2 px-0.5">
+                    <div className="flex items-center justify-end gap-0.5">
+                      <Button onClick={() => handleOpenEditModal(p)} variant="ghost" size="icon" className="h-7 w-7 p-0 text-primary hover:bg-primary/10">
                         <Edit2 className="h-3.5 w-3.5" />
                       </Button>
-                      <Button onClick={() => handleDelete(p.code)} variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                      <Button onClick={() => handleDelete(p.code)} variant="ghost" size="icon" className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>

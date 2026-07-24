@@ -42,7 +42,7 @@ export default function RootLayout({
       <body className="min-h-full bg-background text-foreground flex flex-col pb-16 md:pb-0">
         <PWAProvider>
           <Navbar />
-          <main className="flex-1 w-full p-4 md:p-6 pb-20 md:pb-6">
+          <main className="flex-1 w-full p-2 sm:p-4 md:p-6 pb-20 md:pb-6 max-w-full overflow-x-hidden">
             {children}
           </main>
         </PWAProvider>

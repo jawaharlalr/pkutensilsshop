@@ -237,6 +237,8 @@ export default function SalesHistoryPage() {
               <div className="space-y-1 text-xs border-b pb-2 mb-2">
                 <div><b>{t("pos.invoiceNo")}:</b> {selectedInvoice.invoiceNumber}</div>
                 <div><b>{t("inv.lblDate")}:</b> {selectedInvoice.date} {selectedInvoice.time}</div>
+                {selectedInvoice.customerName && <div><b>{t("inv.lblCustomer")}:</b> {selectedInvoice.customerName}</div>}
+                {selectedInvoice.customerPhone && <div><b>{t("inv.lblPhone")}:</b> {selectedInvoice.customerPhone}</div>}
               </div>
               {/* Lined Grid Preview in Detail Dialog */}
               <table className="w-full text-xs mb-2 border-collapse">
@@ -321,6 +323,8 @@ export default function SalesHistoryPage() {
           <div style={{ fontSize: "12px", borderBottom: "1px dashed black", paddingBottom: "5px", marginBottom: "10px" }}>
             <div><b>{t("pos.invoiceNo")}:</b> {selectedInvoice.invoiceNumber}</div>
             <div><b>Date & Time:</b> {printDateTime || `${selectedInvoice.date}  ${selectedInvoice.time}`}</div>
+            {selectedInvoice.customerName && <div><b>Customer:</b> {selectedInvoice.customerName}</div>}
+            {selectedInvoice.customerPhone && <div><b>Phone:</b> {selectedInvoice.customerPhone}</div>}
             {selectedInvoice.isDeleted === 1 && <div style={{ color: "red", fontWeight: "bold", marginTop: "5px" }}>*** VOIDED BILL ***</div>}
           </div>
           

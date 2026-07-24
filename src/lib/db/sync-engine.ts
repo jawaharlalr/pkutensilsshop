@@ -135,15 +135,11 @@ export async function syncAll(): Promise<{ success: boolean; count: number }> {
   let syncedCount = 0;
   
   try {
-    // Always pull downstream changes from Firestore first to keep all collections updated
+    // 1. Pull downstream changes from Firestore first to keep all collections updated
     await pullDownstreamChanges();
 
+    // 2. Process items queued in local syncQueue
     const queue = await db.syncQueue.orderBy("id").toArray();
-    if (queue.length === 0) {
-      isSyncingInProgress = false;
-      return { success: true, count: 0 };
-    }
-
     for (const item of queue) {
       try {
         if (item.collection === "products") {
@@ -160,15 +156,17 @@ export async function syncAll(): Promise<{ success: boolean; count: number }> {
             const invoice = item.payload;
 
             // Write Invoice to 'Sales' collection with nested items array
-            await setDoc(docRef, {
+            await setDoc(docRef, sanitizePayload({
               invoiceNumber: invoice.invoiceNumber,
               date: invoice.date,
               time: invoice.time,
+              customerName: invoice.customerName || null,
+              customerPhone: invoice.customerPhone || null,
               grandTotal: invoice.grandTotal,
               isDeleted: invoice.isDeleted,
-              items: sanitizePayload(invoice.items || []),
+              items: invoice.items || [],
               lastUpdated: invoice.lastUpdated || Date.now(),
-            });
+            }));
           }
         } 
         else if (item.collection === "settings") {
@@ -206,8 +204,53 @@ export async function syncAll(): Promise<{ success: boolean; count: number }> {
         syncedCount++;
       } catch (error) {
         console.error(`Sync failed for queue item ${item.id}:`, error);
-        // Break out of loop on connection failure to avoid flooding errors
         break;
+      }
+    }
+
+    // 3. Scan & sync any local invoices marked unsynced (synced === 0)
+    const unsyncedInvoices = await db.invoices.where("synced").equals(0).toArray();
+    for (const inv of unsyncedInvoices) {
+      if (inv.invoiceNumber) {
+        try {
+          const docRef = doc(dbFirestore, "Sales", inv.invoiceNumber);
+          await setDoc(docRef, sanitizePayload({
+            invoiceNumber: inv.invoiceNumber,
+            date: inv.date,
+            time: inv.time,
+            customerName: inv.customerName || null,
+            customerPhone: inv.customerPhone || null,
+            grandTotal: inv.grandTotal,
+            isDeleted: inv.isDeleted,
+            items: inv.items || [],
+            lastUpdated: inv.lastUpdated || Date.now(),
+          }));
+          await db.invoices.where("invoiceNumber").equals(inv.invoiceNumber).modify({ synced: 1 });
+          syncedCount++;
+        } catch (e) {
+          console.error(`Failed to sync invoice ${inv.invoiceNumber}:`, e);
+        }
+      }
+    }
+
+    // 4. Scan & sync local products to Firestore
+    const localProducts = await db.products.toArray();
+    for (const prod of localProducts) {
+      if (prod.code) {
+        try {
+          const docRef = doc(dbFirestore, "Products", prod.code);
+          await setDoc(docRef, sanitizePayload({
+            code: prod.code,
+            name: prod.name,
+            nameTamil: prod.nameTamil || "",
+            category: prod.category || "",
+            sellingPrice: prod.sellingPrice,
+            lastUpdated: prod.lastUpdated || Date.now(),
+          }));
+          syncedCount++;
+        } catch (e) {
+          console.error(`Failed to sync product ${prod.code}:`, e);
+        }
       }
     }
 
@@ -220,20 +263,39 @@ export async function syncAll(): Promise<{ success: boolean; count: number }> {
   }
 }
 
+// Helper to safely extract Product from Firestore document
+function parseProductDoc(docSnap: any): Product | null {
+  const data = docSnap.data();
+  if (!data) return null;
+  const code = String(data.code || data.productCode || docSnap.id).trim().toUpperCase();
+  const name = String(data.name || data.productName || docSnap.id).trim();
+  const sellingPrice = Number(data.sellingPrice ?? data.price ?? data.amount ?? 0);
+  if (!code || !name) return null;
+  return {
+    code,
+    name,
+    nameTamil: data.nameTamil || "",
+    category: data.category || "",
+    sellingPrice: isNaN(sellingPrice) ? 0 : sellingPrice,
+    lastUpdated: Number(data.lastUpdated || Date.now()),
+  };
+}
+
 // Pull products, settings, and sales from Firestore (downstream sync)
 export async function pullDownstreamChanges() {
   if (!dbFirestore) return;
   if (!isOnline()) return;
 
   try {
-    // 1. Pull Products
-    const productsSnapshot = await getDocs(collection(dbFirestore, "Products"));
+    // 1. Pull Products (Try "Products", fallback to "products")
+    let productsSnapshot = await getDocs(collection(dbFirestore, "Products"));
+    if (productsSnapshot.empty) {
+      productsSnapshot = await getDocs(collection(dbFirestore, "products"));
+    }
+
     for (const docSnap of productsSnapshot.docs) {
-      const fbProduct = docSnap.data() as Product;
-      if (!fbProduct || !fbProduct.code) {
-        console.warn("Skipping invalid product doc from Firestore:", docSnap.id);
-        continue;
-      }
+      const fbProduct = parseProductDoc(docSnap);
+      if (!fbProduct) continue;
 
       const localProduct = await db.products.where("code").equals(fbProduct.code).first();
 
@@ -244,14 +306,17 @@ export async function pullDownstreamChanges() {
           name: fbProduct.name,
           nameTamil: fbProduct.nameTamil || "",
           category: fbProduct.category || "",
-          sellingPrice: Number(fbProduct.sellingPrice),
+          sellingPrice: fbProduct.sellingPrice,
           lastUpdated: fbProduct.lastUpdated || Date.now(),
         });
       }
     }
 
-    // 2. Pull Settings
-    const settingsSnapshot = await getDocs(collection(dbFirestore, "Settings"));
+    // 2. Pull Settings (Try "Settings", fallback to "settings")
+    let settingsSnapshot = await getDocs(collection(dbFirestore, "Settings"));
+    if (settingsSnapshot.empty) {
+      settingsSnapshot = await getDocs(collection(dbFirestore, "settings"));
+    }
     for (const docSnap of settingsSnapshot.docs) {
       const fbSetting = docSnap.data();
       const localSetting = await db.settings.get(docSnap.id);
@@ -264,24 +329,25 @@ export async function pullDownstreamChanges() {
       }
     }
 
-    // 3. Pull Sales (Invoices)
-    const salesSnapshot = await getDocs(collection(dbFirestore, "Sales"));
+    // 3. Pull Sales (Invoices) (Try "Sales", fallback to "sales")
+    let salesSnapshot = await getDocs(collection(dbFirestore, "Sales"));
+    if (salesSnapshot.empty) {
+      salesSnapshot = await getDocs(collection(dbFirestore, "sales"));
+    }
     for (const docSnap of salesSnapshot.docs) {
       const fbInvoice = docSnap.data() as Invoice;
-      if (!fbInvoice || !fbInvoice.invoiceNumber) {
-        console.warn("Skipping invalid sales doc from Firestore:", docSnap.id);
-        continue;
-      }
+      const invNum = fbInvoice.invoiceNumber || docSnap.id;
+      if (!invNum) continue;
 
-      const localInvoice = await db.invoices.where("invoiceNumber").equals(fbInvoice.invoiceNumber).first();
+      const localInvoice = await db.invoices.where("invoiceNumber").equals(invNum).first();
 
       if (!localInvoice || (fbInvoice.lastUpdated || 0) > (localInvoice.lastUpdated || 0)) {
         await db.invoices.put({
           ...(localInvoice || {}),
-          invoiceNumber: fbInvoice.invoiceNumber,
-          date: fbInvoice.date,
-          time: fbInvoice.time,
-          grandTotal: Number(fbInvoice.grandTotal),
+          invoiceNumber: invNum,
+          date: fbInvoice.date || new Date().toISOString().split("T")[0],
+          time: fbInvoice.time || new Date().toTimeString().split(" ")[0],
+          grandTotal: Number(fbInvoice.grandTotal || 0),
           isDeleted: Number(fbInvoice.isDeleted || 0),
           synced: 1,
           items: fbInvoice.items || [],
@@ -342,11 +408,8 @@ export function startRealtimeSync(onSyncSuccess?: () => void) {
     // 1. Listen to Products
     unsubProducts = onSnapshot(collection(dbFirestore, "Products"), (snapshot) => {
       snapshot.docChanges().forEach(async (change) => {
-        const fbProduct = change.doc.data() as Product;
-        if (!fbProduct || !fbProduct.code) {
-          console.warn("Skipping invalid product doc from Firestore in realtime sync:", change.doc.id);
-          return;
-        }
+        const fbProduct = parseProductDoc(change.doc);
+        if (!fbProduct) return;
 
         if (change.type === "removed") {
           const local = await db.products.where("code").equals(fbProduct.code).first();
@@ -360,7 +423,7 @@ export function startRealtimeSync(onSyncSuccess?: () => void) {
               name: fbProduct.name,
               nameTamil: fbProduct.nameTamil || "",
               category: fbProduct.category || "",
-              sellingPrice: Number(fbProduct.sellingPrice),
+              sellingPrice: fbProduct.sellingPrice,
               lastUpdated: fbProduct.lastUpdated || Date.now(),
             });
           }
@@ -396,23 +459,21 @@ export function startRealtimeSync(onSyncSuccess?: () => void) {
     unsubSales = onSnapshot(collection(dbFirestore, "Sales"), (snapshot) => {
       snapshot.docChanges().forEach(async (change) => {
         const fbInvoice = change.doc.data() as Invoice;
-        if (!fbInvoice || !fbInvoice.invoiceNumber) {
-          console.warn("Skipping invalid sales doc from Firestore in realtime sync:", change.doc.id);
-          return;
-        }
+        const invNum = fbInvoice.invoiceNumber || change.doc.id;
+        if (!invNum) return;
 
         if (change.type === "removed") {
-          const local = await db.invoices.where("invoiceNumber").equals(fbInvoice.invoiceNumber).first();
+          const local = await db.invoices.where("invoiceNumber").equals(invNum).first();
           if (local) await db.invoices.delete(local.id!);
         } else {
-          const localInvoice = await db.invoices.where("invoiceNumber").equals(fbInvoice.invoiceNumber).first();
+          const localInvoice = await db.invoices.where("invoiceNumber").equals(invNum).first();
           if (!localInvoice || (fbInvoice.lastUpdated || 0) > (localInvoice.lastUpdated || 0)) {
             await db.invoices.put({
               ...(localInvoice || {}),
-              invoiceNumber: fbInvoice.invoiceNumber,
-              date: fbInvoice.date,
-              time: fbInvoice.time,
-              grandTotal: Number(fbInvoice.grandTotal),
+              invoiceNumber: invNum,
+              date: fbInvoice.date || new Date().toISOString().split("T")[0],
+              time: fbInvoice.time || new Date().toTimeString().split(" ")[0],
+              grandTotal: Number(fbInvoice.grandTotal || 0),
               isDeleted: Number(fbInvoice.isDeleted || 0),
               synced: 1,
               items: fbInvoice.items || [],

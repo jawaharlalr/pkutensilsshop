@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getSetting, SETTINGS_KEYS } from "@/lib/db/dexie-db";
-import { Search, ShoppingCart, Trash2, Plus, Minus, Receipt, CheckCircle, RefreshCw } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, Receipt, CheckCircle, RefreshCw, Printer } from "lucide-react";
 import { usePWA } from "@/components/PWAProvider";
 
 export default function POSPage() {
@@ -187,6 +187,8 @@ export default function POSPage() {
       invoiceNumber,
       date: formattedDate,
       time: formattedTime,
+      customerName: customerName.trim() || undefined,
+      customerPhone: customerPhone.trim() || undefined,
       items: invoiceItems,
       grandTotal,
       synced: 0,
@@ -198,6 +200,13 @@ export default function POSPage() {
       await saveInvoice(newInvoice);
 
       setLastSavedInvoice(newInvoice);
+      setPrintDateTime(`${formattedDate}  ${formattedTime}`);
+
+      // Auto-trigger browser print dialog for immediate printing
+      setTimeout(() => {
+        window.print();
+      }, 100);
+
       setIsSuccessModalOpen(true);
 
       // Reset cart and invoice number
@@ -271,7 +280,7 @@ export default function POSPage() {
               {searchResults.length > 0 && (
                 <div className="border rounded-md divide-y bg-background shadow-sm animate-in fade-in-50">
                   {searchResults.map((p) => {
-                    const dispName = language === "ta" && p.nameTamil ? p.nameTamil : p.name;
+                    const dispName = p.name;
                     return (
                       <button
                         key={p.id}
@@ -282,7 +291,8 @@ export default function POSPage() {
                         className="w-full flex items-center justify-between p-3.5 hover:bg-muted text-left cursor-pointer"
                       >
                         <div>
-                          <div className="font-semibold">{dispName}</div>
+                          <div className="font-semibold">{p.name}</div>
+                          {p.nameTamil && <div className="text-xs font-normal text-muted-foreground">{p.nameTamil}</div>}
                           <div className="text-xs font-mono text-muted-foreground">{p.code}</div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -298,16 +308,16 @@ export default function POSPage() {
 
           {/* Cart Table panel */}
           <Card>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="w-full text-xs sm:text-sm">
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12 text-center">{t("pos.thSNo")}</TableHead>
-                    <TableHead>{t("pos.thProduct")}</TableHead>
-                    <TableHead className="text-center w-24">{t("pos.thPrice")}</TableHead>
-                    <TableHead className="text-center w-36">{t("pos.thQty")}</TableHead>
-                    <TableHead className="text-right w-24">{t("pos.thAmt")}</TableHead>
-                    <TableHead className="text-right w-16"></TableHead>
+                  <TableRow className="bg-muted/30">
+                    <TableHead className="w-7 sm:w-12 text-center py-2 px-1 text-[11px] sm:text-xs">{t("pos.thSNo")}</TableHead>
+                    <TableHead className="py-2 px-1 sm:px-3 text-[11px] sm:text-xs">{t("pos.thProduct")}</TableHead>
+                    <TableHead className="text-center w-14 sm:w-24 py-2 px-1 text-[11px] sm:text-xs">{t("pos.thPrice")}</TableHead>
+                    <TableHead className="text-center w-20 sm:w-32 py-2 px-1 text-[11px] sm:text-xs">{t("pos.thQty")}</TableHead>
+                    <TableHead className="text-right w-16 sm:w-24 py-2 px-1 text-[11px] sm:text-xs">{t("pos.thAmt")}</TableHead>
+                    <TableHead className="w-7 sm:w-12 py-2 px-0.5"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -320,29 +330,33 @@ export default function POSPage() {
                   ) : (
                     cart.map((item, idx) => {
                       const activePrice = item.customizedPrice !== undefined ? item.customizedPrice : item.product.sellingPrice;
-                      const dispName = language === "ta" && item.product.nameTamil ? item.product.nameTamil : item.product.name;
                       return (
-                        <TableRow key={item.product.id}>
-                          <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
-                          <TableCell>
-                            <div className="font-semibold">{dispName}</div>
-                            <div className="text-xs font-mono text-muted-foreground">{item.product.code}</div>
+                        <TableRow key={item.product.id} className="align-middle">
+                          <TableCell className="text-center font-medium text-muted-foreground align-middle py-2 px-1 text-[10px] sm:text-xs">{idx + 1}</TableCell>
+                          <TableCell className="align-middle py-2 px-1 sm:px-3">
+                            <div className="flex flex-col gap-0.5 max-w-[110px] sm:max-w-none">
+                              <span className="font-semibold text-xs sm:text-sm leading-tight break-words">{item.product.name}</span>
+                              {item.product.nameTamil && (
+                                <span className="text-[11px] text-muted-foreground leading-tight break-words">{item.product.nameTamil}</span>
+                              )}
+                              <span className="text-[10px] font-mono text-muted-foreground/80">{item.product.code}</span>
+                            </div>
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center align-middle py-2 px-0.5">
                             <Input
                               type="number"
                               value={activePrice}
                               onChange={(e) => updatePrice(item.product.code, e.target.value)}
-                              className="w-20 text-center h-8 px-1 font-semibold"
+                              className="w-14 sm:w-20 text-center h-7 sm:h-8 px-0.5 font-semibold text-xs mx-auto"
                             />
                           </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-1.5">
+                          <TableCell className="text-center align-middle py-2 px-0.5">
+                            <div className="flex items-center justify-center gap-0.5 sm:gap-1">
                               <Button
                                 onClick={() => updateQuantity(item.product.code, item.quantity - 1)}
                                 variant="outline"
                                 size="icon"
-                                className="h-7 w-7"
+                                className="h-6 w-6 sm:h-7 sm:w-7 shrink-0 p-0"
                               >
                                 <Minus className="h-3 w-3" />
                               </Button>
@@ -350,29 +364,29 @@ export default function POSPage() {
                                 type="number"
                                 value={item.quantity}
                                 onChange={(e) => updateQuantity(item.product.code, parseInt(e.target.value, 10) || 0)}
-                                className="w-12 text-center h-8 px-1 font-bold"
+                                className="w-8 sm:w-12 text-center h-6 sm:h-7 px-0 font-bold text-xs"
                               />
                               <Button
                                 onClick={() => updateQuantity(item.product.code, item.quantity + 1)}
                                 variant="outline"
                                 size="icon"
-                                className="h-7 w-7"
+                                className="h-6 w-6 sm:h-7 sm:w-7 shrink-0 p-0"
                               >
                                 <Plus className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-bold">
+                          <TableCell className="text-right font-bold text-xs sm:text-sm align-middle py-2 px-1 whitespace-nowrap">
                             ₹{(activePrice * item.quantity).toFixed(2)}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-center align-middle py-2 px-0.5">
                             <Button
                               onClick={() => removeFromCart(item.product.code)}
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive"
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:bg-destructive/10"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -431,7 +445,7 @@ export default function POSPage() {
                 className="w-full h-12 text-base font-bold gap-2"
                 variant="success"
               >
-                <Receipt className="h-5 w-5" /> {t("pos.saveBill")}
+                <Printer className="h-5 w-5" /> {t("pos.saveBill")}
               </Button>
               <Button
                 onClick={handleCancelBill}
@@ -467,7 +481,8 @@ export default function POSPage() {
               <div className="space-y-1 text-xs border-b pb-2 mb-2">
                 <div><b>{t("pos.invoiceNo")}:</b> {lastSavedInvoice.invoiceNumber}</div>
                 <div><b>{t("inv.lblDate")}:</b> {lastSavedInvoice.date} {lastSavedInvoice.time}</div>
-                {customerName && <div><b>{t("inv.lblCustomer")}:</b> {customerName}</div>}
+                {lastSavedInvoice.customerName && <div><b>{t("inv.lblCustomer")}:</b> {lastSavedInvoice.customerName}</div>}
+                {lastSavedInvoice.customerPhone && <div><b>{t("inv.lblPhone")}:</b> {lastSavedInvoice.customerPhone}</div>}
               </div>
               {/* Lined Grid Preview in Success Modal */}
               <table className="w-full text-xs mb-2 border-collapse">
@@ -536,8 +551,8 @@ export default function POSPage() {
           <div style={{ fontSize: "12px", borderBottom: "1px dashed black", paddingBottom: "5px", marginBottom: "10px" }}>
             <div><b>{t("pos.invoiceNo")}:</b> {lastSavedInvoice.invoiceNumber}</div>
             <div><b>Date & Time:</b> {printDateTime || `${lastSavedInvoice.date}  ${lastSavedInvoice.time}`}</div>
-            {customerName && <div><b>Customer:</b> {customerName}</div>}
-            {customerPhone && <div><b>Phone:</b> {customerPhone}</div>}
+            {lastSavedInvoice.customerName && <div><b>Customer:</b> {lastSavedInvoice.customerName}</div>}
+            {lastSavedInvoice.customerPhone && <div><b>Phone:</b> {lastSavedInvoice.customerPhone}</div>}
           </div>
           
           {/* Lined Grid Invoice Table - 5 Columns: S.No, Item, Price, Qty, Amount (No Code) */}
